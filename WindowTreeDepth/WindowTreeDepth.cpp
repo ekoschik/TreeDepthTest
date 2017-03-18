@@ -138,15 +138,36 @@ HWND CreateWindowWrap(
     return hwnd;
 }
 
-BOOL CreateWindowTree()
+BOOL CreateWindowTree(int depth, HWND hwndParent)
 {
-    int def = CW_USEDEFAULT;
-    HWND hwndTLW = CreateWindowWrap(NULL, def, def, 500, 400);
-    HWND hwndC1 = CreateWindowWrap(hwndTLW, 50, 50, 200, 200);
-    HWND hwndC2 = CreateWindowWrap(hwndC1, 0, 0, 150, 150);
-    HWND hwndC3 = CreateWindowWrap(hwndC2, 0, 0, 50, 50);
+    if (depth <= 0) {
+        return TRUE;
+    }
 
-    return TRUE;
+    int cx = 700, cy = 600; // starting window size
+    static int step = 10;
+    if (hwndParent == NULL) {
+        HWND hwndTLW = CreateWindowWrap(NULL, CW_USEDEFAULT, CW_USEDEFAULT, cx, cy);
+
+        RECT rcClient;
+        GetClientRect(hwndParent, &rcClient);
+        cx = rcClient.right - rcClient.left;
+        cy = rcClient.bottom - rcClient.top;
+
+        step = cx / depth;
+        CreateWindowTree(depth, hwndTLW);
+        return TRUE;
+    }
+
+    RECT rcClient;
+    GetClientRect(hwndParent, &rcClient);
+    cx = rcClient.right - rcClient.left;
+    cy = rcClient.bottom - rcClient.top;
+
+    return CreateWindowTree(depth - 1, CreateWindowWrap(hwndParent, step,   step,   cx / 2, cy / 2)) &&
+           CreateWindowTree(depth - 1, CreateWindowWrap(hwndParent, step,   cy / 2, cx / 2, cy / 2)) &&
+           CreateWindowTree(depth - 1, CreateWindowWrap(hwndParent, cx / 2, step,   cx / 2, cy / 2)) &&
+           CreateWindowTree(depth - 1, CreateWindowWrap(hwndParent, cx / 2, cy / 2, cx / 2, cy / 2));
 }
 
 BOOL RegisterWindows()
@@ -185,7 +206,7 @@ int main()
         return 1;
     }
     
-    if (!CreateWindowTree()) {
+    if (!CreateWindowTree(6, NULL)) {
         return 1;
     }
 
