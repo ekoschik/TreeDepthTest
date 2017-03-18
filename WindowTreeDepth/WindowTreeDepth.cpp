@@ -4,26 +4,69 @@
 #include <time.h>
 using namespace std;
 
-map<HWND, HBRUSH> colormap;
+HINSTANCE hInst;
+LPCWSTR WndClassTLW = L"Window Frame",
+WndClassChild = L"Child";
+LPCWSTR WndTitleTLW = L"Window Tree Depth Test - Window Frame",
+WndTitleChild = L"Window Tree Depth Test - Child";
 
-VOID AddWindowToColorMap(HWND hwnd)
+struct WindowInfo
 {
+    int index;
+    HBRUSH hbr;
+};
+map<HWND, WindowInfo> windowmap;
+HWND hwndMouseLast = NULL;
+
+VOID AddWindowToMap(HWND hwnd)
+{
+    WindowInfo wi = {};
+
+    // Assign window an index
+    static int iIndex = 0;
+    wi.index = iIndex++;
+
+    // Assign window a color
     int r = rand() % 255;
     int g = rand() % 255;
     int b = rand() % 255;
-    printf("Giving window %X RGB(%i, %i, %i)\n",
-        hwnd, r, g, b);
+    printf("Giving window %i RGB(%i, %i, %i)\n",
+        wi.index, r, g, b);
 
-    HBRUSH hbr = CreateSolidBrush(RGB(r, g, b));
-    colormap[hwnd] = hbr;
+    wi.hbr = CreateSolidBrush(RGB(r, g, b));
+
+    // Add window info to window map
+    windowmap[hwnd] = wi;
 }
 
 VOID Draw(HDC hdc, HWND hwnd)
 {
     RECT rcClient;
     GetClientRect(hwnd, &rcClient);
-    HBRUSH hbr = colormap[hwnd];
+    HBRUSH hbr = windowmap[hwnd].hbr;
     FillRect(hdc, &rcClient, hbr);
+}
+
+
+VOID CALLBACK WndProcCommon(
+    HWND hwnd,
+    UINT message,
+    WPARAM wParam,
+    LPARAM lParam)
+{
+    PAINTSTRUCT ps;
+    switch (message)
+    {
+    case WM_CREATE:
+        AddWindowToMap(hwnd);
+        break;
+
+    case WM_PAINT:
+        HDC hdc = BeginPaint(hwnd, &ps);
+        Draw(hdc, hwnd);
+        EndPaint(hwnd, &ps);
+        break;
+    }
 }
 
 LRESULT CALLBACK WndProcChild(
@@ -32,23 +75,16 @@ LRESULT CALLBACK WndProcChild(
     WPARAM wParam,
     LPARAM lParam)
 {
+    WndProcCommon(hwnd, message, wParam, lParam);
+
     switch (message)
     {
-    case WM_CREATE:
-        AddWindowToColorMap(hwnd);
-        break;
-
-    case WM_PAINT:
-    {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hwnd, &ps);
-        Draw(hdc, hwnd);
-        EndPaint(hwnd, &ps);
-        break;
-    }
-
     case WM_MOUSEMOVE:
-        printf("Child seeing mouse messages...\n");
+        if (hwndMouseLast != hwnd) {
+            printf("Child %i seeing mouse messages...\n",
+                windowmap[hwnd].index);
+            hwndMouseLast = hwnd;
+        }
         break;
     }
     return DefWindowProc(hwnd, message, wParam, lParam);
@@ -60,47 +96,23 @@ LRESULT CALLBACK WndProcTLW(
     WPARAM wParam,
     LPARAM lParam)
 {
+    WndProcCommon(hwnd, message, wParam, lParam);
+
     switch (message)
     {
-    case WM_CREATE:
-        AddWindowToColorMap(hwnd);
-        break;
-
     case WM_MOUSEMOVE:
-        printf("Frame seeing mouse messages...\n");
+        if (hwndMouseLast != hwnd) {
+            printf("Frame seeing mouse messages...\n");
+            hwndMouseLast = hwnd;
+        }
         break;
-
-    case WM_PAINT:
-    {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hwnd, &ps);
-        Draw(hdc, hwnd);
-        EndPaint(hwnd, &ps);
-        break;
-    }
 
     case WM_DESTROY:
         PostQuitMessage(0);
     }
+
     return DefWindowProc(hwnd, message, wParam, lParam);
 }
-
-HWND CreateWindowWrap(HWND, int, int, int, int);
-
-BOOL CreateWindowTree()
-{
-    int def = CW_USEDEFAULT;
-    HWND hwndTLW = CreateWindowWrap(NULL, def, def, 500, 400);
-    HWND hwndC1 = CreateWindowWrap(hwndTLW, 50, 50, 200, 200);
-
-    return TRUE;
-}
-
-HINSTANCE hInst;
-LPCWSTR WndClassTLW = L"Window Frame",
-WndClassChild = L"Child";
-LPCWSTR WndTitleTLW = L"Window Tree Depth Test - Window Frame",
-WndTitleChild = L"Window Tree Depth Test - Child";
 
 HWND CreateWindowWrap(
     HWND hWndParent,
@@ -124,6 +136,17 @@ HWND CreateWindowWrap(
 
     ShowWindow(hwnd, SW_SHOW);
     return hwnd;
+}
+
+BOOL CreateWindowTree()
+{
+    int def = CW_USEDEFAULT;
+    HWND hwndTLW = CreateWindowWrap(NULL, def, def, 500, 400);
+    HWND hwndC1 = CreateWindowWrap(hwndTLW, 50, 50, 200, 200);
+    HWND hwndC2 = CreateWindowWrap(hwndC1, 0, 0, 150, 150);
+    HWND hwndC3 = CreateWindowWrap(hwndC2, 0, 0, 50, 50);
+
+    return TRUE;
 }
 
 BOOL RegisterWindows()
