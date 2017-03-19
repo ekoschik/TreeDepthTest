@@ -11,45 +11,8 @@ int cx = 700, cy = 600;
 int depth = 30; // !WARNING! keep this guy VERY low, ** < 35 **
 int step = 7; // spacing between a parent and it's child
 
-HINSTANCE hInst;
-LPCWSTR WndClassTLW = L"Window Frame",
-        WndClassChild = L"Child",
-        WndTitleTLW = L"Window Tree Depth Test - Window Frame",
-        WndTitleChild = L"Window Tree Depth Test - Child";
-
-HWND CreateWindowWrap(HWND hWndParent, int x, int y, int cx, int cy);
 map<HWND, HBRUSH> windowmap;
 HWND hwndMouseLast = NULL;
-
-BOOL CreateWindowTree(int depth, int step, HWND hwnd)
-{
-     if (depth <= 0) {
-        return TRUE;
-    }
-
-    RECT rcClient;
-    GetClientRect(hwnd, &rcClient);
-    HWND hwndChild = CreateWindowWrap(hwnd, step, step,
-        rcClient.right - rcClient.left - (2 * step),
-        rcClient.bottom - rcClient.top - (2 * step));
-
-    if (hwndChild == NULL) {
-        return FALSE;
-    }
-
-    return CreateWindowTree(depth - 1, step, hwndChild);
-}
-
-BOOL CreateWindowTree()
-{
-    HWND hwnd = CreateWindowWrap(NULL, CW_USEDEFAULT, CW_USEDEFAULT, cx, cy);
-    if (!CreateWindowTree(depth, step, hwnd)) {
-        return FALSE;
-    }
-
-    printf("Created %i windows.\n", windowmap.size());
-    return TRUE;
-}
 
 VOID Draw(HDC hdc, HWND hwnd)
 {
@@ -117,25 +80,60 @@ LRESULT CALLBACK WndProcTLW(
     return DefWindowProc(hwnd, message, wParam, lParam);
 }
 
-HWND CreateWindowWrap(HWND hWndParent, int x, int y, int cx, int cy)
-{
-    BOOL bTLW = hWndParent == NULL;
+HINSTANCE hInst;
+LPCWSTR WndClassTLW = L"Window Frame",
+        WndClassChild = L"Child",
+        WndTitleTLW = L"Window Tree Depth Test - Window Frame",
+        WndTitleChild = L"Window Tree Depth Test - Child";
 
-    HWND hwnd = CreateWindowEx(
-        0,
-        bTLW ? WndClassTLW : WndClassChild,
-        bTLW ? WndTitleTLW : WndTitleChild,
-        bTLW ? WS_OVERLAPPEDWINDOW : WS_CHILD,
-        x, y, cx, cy,
-        hWndParent, nullptr, hInst, nullptr);
+BOOL CreateWindowTree(int depth, HWND hwndParent)
+{
+    if (depth <= 0) {
+        return TRUE;
+    }
+
+    RECT rcClient;
+    GetClientRect(hwndParent, &rcClient);
+    int cx = rcClient.right - rcClient.left;
+    int cy = rcClient.bottom - rcClient.top;
+
+    HWND hwndChild = CreateWindowEx(
+        0, WndClassChild, WndTitleChild, WS_CHILD,
+        step, step, cx - (2 * step), cy - (2 * step),
+        hwndParent, nullptr, hInst, nullptr);
+
+    if (hwndChild == NULL) {
+        printf("CreateWindow failed, last error: %i\n", GetLastError());
+        return FALSE;
+    }
+
+    ShowWindow(hwndChild, SW_SHOW);
+    return CreateWindowTree(depth - 1, hwndChild);
+}
+
+BOOL CreateWindowTree()
+{
+    // Create top level window
+    HWND hwnd = CreateWindowEx(0,
+        WndClassTLW,
+        WndTitleTLW,
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, cx, cy,
+        NULL, nullptr, hInst, nullptr);
 
     if (!hwnd) {
-        printf("CreateWindow failed, last error: %i\n", GetLastError());
+        printf("Creating TLW failed, last error: %i\n", GetLastError());
         return NULL;
     }
 
     ShowWindow(hwnd, SW_SHOW);
-    return hwnd;
+
+    if (!CreateWindowTree(depth, hwnd)) {
+        return FALSE;
+    }
+
+    printf("Created %i windows.\n", windowmap.size());
+    return TRUE;
 }
 
 BOOL RegisterWindows()
@@ -143,6 +141,7 @@ BOOL RegisterWindows()
     WNDCLASSEX wcex = { 0 };
     wcex.cbSize = sizeof(WNDCLASSEX);
 
+    // Register top level window class
     wcex.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
     wcex.lpfnWndProc = WndProcTLW;
     wcex.hInstance = hInst;
@@ -153,6 +152,7 @@ BOOL RegisterWindows()
         return FALSE;
     }
 
+    // Register child window class
     wcex.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
     wcex.lpfnWndProc = WndProcChild;
     wcex.hInstance = hInst;
@@ -171,14 +171,12 @@ int main()
     srand((int)time(NULL));
     hInst = GetModuleHandle(NULL);
 
-    if (!RegisterWindows()) {
+    // Initialize windows
+    if (!RegisterWindows() || !CreateWindowTree()) {
         return 1;
     }
     
-    if (!CreateWindowTree()) {
-        return 1;
-    }
-
+    // Message pump
     MSG msg;
     while (GetMessage(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
