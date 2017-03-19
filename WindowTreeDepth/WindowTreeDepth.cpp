@@ -7,54 +7,37 @@ using namespace std;
 // Window size
 int cx = 700, cy = 600;
 
-// WARNING:
-// A tree depth of 5 creates 1365 window,
-// but 100 will take down the system (bluescreen).
-// ... Do NOT tweak this on a critical system.
-
 // Window tree depth and spacing
-int depth = 4; // !WANRING! keep this guy VERY low, < 5 unless on a test machine
-int step = 2; // spacing between a parent and it's children
+int depth = 30; // !WARNING! keep this guy VERY low, ** < 35 **
+int step = 7; // spacing between a parent and it's child
 
 HINSTANCE hInst;
 LPCWSTR WndClassTLW = L"Window Frame",
         WndClassChild = L"Child",
         WndTitleTLW = L"Window Tree Depth Test - Window Frame",
         WndTitleChild = L"Window Tree Depth Test - Child";
+
 HWND CreateWindowWrap(HWND hWndParent, int x, int y, int cx, int cy);
 map<HWND, HBRUSH> windowmap;
 HWND hwndMouseLast = NULL;
 
-
 BOOL CreateWindowTree(int depth, int step, HWND hwnd)
 {
-    // When depth hits zero we've reached the depth limit
-    if (depth <= 0) {
+     if (depth <= 0) {
         return TRUE;
     }
 
-    // For each window, first create four children filling up each corner,
-    // with 'step' space between the parent and children.
     RECT rcClient;
     GetClientRect(hwnd, &rcClient);
-    int cx = rcClient.right - rcClient.left - (2 * step);
-    int cy = rcClient.bottom - rcClient.top - (2 * step);
+    HWND hwndChild = CreateWindowWrap(hwnd, step, step,
+        rcClient.right - rcClient.left - (2 * step),
+        rcClient.bottom - rcClient.top - (2 * step));
 
-    HWND hwnd1 = CreateWindowWrap(hwnd, step, step, cx / 2, cy / 2);
-    HWND hwnd2 = CreateWindowWrap(hwnd, step, cy / 2, cx / 2, cy / 2);
-    HWND hwnd3 = CreateWindowWrap(hwnd, cx / 2, step, cx / 2, cy / 2);
-    HWND hwnd4 = CreateWindowWrap(hwnd, cx / 2, cy / 2, cx / 2, cy / 2);
-    if (!hwnd1 || !hwnd2 || !hwnd3 || !hwnd4) {
-        printf("Creating child window failed, aborting tree creation.\n");
+    if (hwndChild == NULL) {
         return FALSE;
     }
 
-    // Create a window tree for each child, decrementing depth by 1
-    depth--;
-    return CreateWindowTree(depth, step, hwnd1) &&
-           CreateWindowTree(depth, step, hwnd2) &&
-           CreateWindowTree(depth, step, hwnd3) &&
-           CreateWindowTree(depth, step, hwnd4);
+    return CreateWindowTree(depth - 1, step, hwndChild);
 }
 
 BOOL CreateWindowTree()
@@ -106,7 +89,6 @@ VOID WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam, BOOL bTLW)
             InvalidateRect(hwndPrev, NULL, TRUE);
         }
         break;
-
     }
 }
 
@@ -148,6 +130,7 @@ HWND CreateWindowWrap(HWND hWndParent, int x, int y, int cx, int cy)
         hWndParent, nullptr, hInst, nullptr);
 
     if (!hwnd) {
+        printf("CreateWindow failed, last error: %i\n", GetLastError());
         return NULL;
     }
 
@@ -185,7 +168,7 @@ BOOL RegisterWindows()
 
 int main()
 {
-    srand(time(NULL));
+    srand((int)time(NULL));
     hInst = GetModuleHandle(NULL);
 
     if (!RegisterWindows()) {
