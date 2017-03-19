@@ -11,40 +11,41 @@ int cx = 700, cy = 600;
 int depth = 30; // !WARNING! keep this guy VERY low, ** < 35 **
 int step = 7; // spacing between a parent and it's child
 
+// Bookkeeping to color windows and highlight current mouse recipient
 map<HWND, HBRUSH> windowmap;
 HWND hwndMouseLast = NULL;
-
-VOID Draw(HDC hdc, HWND hwnd)
-{
-    RECT rcClient;
-    GetClientRect(hwnd, &rcClient);
-    
-    static HBRUSH hbrHover = CreateSolidBrush(RGB(229, 244, 66));
-    FillRect(hdc, &rcClient,
-        (hwnd == hwndMouseLast) ? hbrHover : windowmap[hwnd]);
-}
+COLORREF rgbHighlight = RGB(229, 244, 66);
 
 VOID WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam, BOOL bTLW)
 {
-    PAINTSTRUCT ps;
-    HDC hdc;
-
     switch (message)
     {
     case WM_CREATE:
-        // Pick a random color, create a brush of that color, and add
-        // brush to the window map
+        // Add the window to the window map with a brush of a random color
         windowmap[hwnd] = CreateSolidBrush(
             RGB(rand() % 255, rand() % 255, rand() % 255));
         break;
 
     case WM_PAINT:
-        hdc = BeginPaint(hwnd, &ps);
-        Draw(hdc, hwnd);
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+
+        RECT rcClient;
+        GetClientRect(hwnd, &rcClient);
+
+        // Fill the client area with the window's color, or the highlight
+        // color if this window is the last mouse window
+        static HBRUSH hbrHover = CreateSolidBrush(rgbHighlight);
+        HBRUSH hbr = (hwnd == hwndMouseLast) ? hbrHover : windowmap[hwnd];
+        FillRect(hdc, &rcClient, hbr);
         EndPaint(hwnd, &ps);
         break;
+    }
 
     case WM_MOUSEMOVE:
+        // Set this window as the highlight window, and repaint the previous
+        // highlight window
         if (hwndMouseLast != hwnd) {
             HWND hwndPrev = hwndMouseLast;
             hwndMouseLast = hwnd;
@@ -92,14 +93,16 @@ BOOL CreateWindowTree(int depth, HWND hwndParent)
         return TRUE;
     }
 
+    // Each child is the size of it's parent indented by step
     RECT rcClient;
     GetClientRect(hwndParent, &rcClient);
-    int cx = rcClient.right - rcClient.left;
-    int cy = rcClient.bottom - rcClient.top;
+    int cx = rcClient.right - rcClient.left - (2 * step);
+    int cy = rcClient.bottom - rcClient.top - (2 * step);
 
+    // Create the child window
     HWND hwndChild = CreateWindowEx(
         0, WndClassChild, WndTitleChild, WS_CHILD,
-        step, step, cx - (2 * step), cy - (2 * step),
+        step, step, cx , cy,
         hwndParent, nullptr, hInst, nullptr);
 
     if (hwndChild == NULL) {
@@ -108,6 +111,8 @@ BOOL CreateWindowTree(int depth, HWND hwndParent)
     }
 
     ShowWindow(hwndChild, SW_SHOW);
+
+    // Create more children
     return CreateWindowTree(depth - 1, hwndChild);
 }
 
@@ -128,6 +133,7 @@ BOOL CreateWindowTree()
 
     ShowWindow(hwnd, SW_SHOW);
 
+    // Create child windows
     if (!CreateWindowTree(depth, hwnd)) {
         return FALSE;
     }
