@@ -72,10 +72,10 @@ LPCWSTR WndClassTLW = L"Window Frame",
         WndTitleTLW = L"Window Tree Depth Test - Window Frame",
         WndTitleChild = L"Window Tree Depth Test - Child";
 
-BOOL CreateWindowTree(int depth, HWND hwndParent)
+bool CreateWindowTree(int depth, HWND hwndParent)
 {
     if (depth <= 0) {
-        return TRUE;
+        return true;
     }
 
     // Each child is the size of it's parent indented by step
@@ -92,7 +92,7 @@ BOOL CreateWindowTree(int depth, HWND hwndParent)
 
     if (!hwndChild) {
         printf("CreateWindow failed, last error: %i\n", GetLastError());
-        return FALSE;
+        return false;
     }
 
     ShowWindow(hwndChild, SW_SHOW);
@@ -101,7 +101,7 @@ BOOL CreateWindowTree(int depth, HWND hwndParent)
     return CreateWindowTree(depth - 1, hwndChild);
 }
 
-BOOL CreateWindowTree()
+bool CreateWindowTree()
 {
     // Create top level window
     HWND hwnd = CreateWindowEx(0,
@@ -113,21 +113,21 @@ BOOL CreateWindowTree()
 
     if (!hwnd) {
         printf("Creating TLW failed, last error: %i\n", GetLastError());
-        return NULL;
+        return false;
     }
 
     ShowWindow(hwnd, SW_SHOW);
 
     // Create child windows
     if (!CreateWindowTree(depth, hwnd)) {
-        return FALSE;
+        return false;
     }
 
     printf("Created %i windows.\n", windowmap.size());
-    return TRUE;
+    return true;
 }
 
-BOOL RegisterWindows()
+bool RegisterWindows()
 {
     WNDCLASSEX wcex = { 0 };
     wcex.cbSize = sizeof(WNDCLASSEX);
@@ -140,7 +140,7 @@ BOOL RegisterWindows()
     wcex.lpszClassName = WndClassTLW;
     if (!RegisterClassEx(&wcex)) {
         printf("Failed to register TLW window class!\n");
-        return FALSE;
+        return false;
     }
 
     // Register child window class
@@ -151,10 +151,10 @@ BOOL RegisterWindows()
     wcex.lpszClassName = WndClassChild;
     if (!RegisterClassEx(&wcex)) {
         printf("Failed to register child window class!\n");
-        return FALSE;
+        return false;
     }
 
-    return TRUE;
+    return true;
 }
 
 int main()
