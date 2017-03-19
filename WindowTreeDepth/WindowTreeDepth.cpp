@@ -178,20 +178,21 @@ void CheckArgs(int argc, char *argv[])
         try {
             int depthOverride = stoi(string(argv[1]));
 
-            if (depthOverride > 0) {
-                if (depthOverride < maxDepth ||
-                    (argc > 2 && strcmp(argv[2], "-f"))) {
-                    printf("Using depth: %i\n", depthOverride);
-                    depth = depthOverride;
-                } else {
-                    printf("ERROR include '-f' for values > %i\n", maxDepth);
-                    printf("... using default depth %i\n", depth);
-                }
+            if (depthOverride > 0 &&
+                (depthOverride < maxDepth ||
+                (argc > 2 && strcmp(argv[2], "-f")))) {
+                printf("Using override depth: %i\n", depthOverride);
+                depth = depthOverride;
+            } else {
+                printf("ERROR invalid argument, using depth %i\n", depth);
+                printf("note: >%i requires '-f'\n", maxDepth);
             }
         } catch (...) {
-            printf("ERROR only accepts integer argument (depth).\n");
-            printf("note: >%i requires - f\n", maxDepth);
+            printf("ERROR only accepts INTEGER values (depth).\n");
+            printf("note: >%i requires '-f'\n", maxDepth);
         }
+    } else {
+        printf("Using tree depth %i\n", depth);
     }
 }
 
