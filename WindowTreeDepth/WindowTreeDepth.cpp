@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include <windows.h>
+#include <string>
 #include <map>
 #include <time.h>
 using namespace std;
@@ -7,9 +8,8 @@ using namespace std;
 // Window size
 int cx = 700, cy = 600;
 
-// Window tree depth and spacing
+// Window tree depth
 int depth = 30; // !WARNING! keep this guy VERY low, ** < 35 **
-int step = 7; // spacing between a parent and it's child
 
 // Bookkeeping to color windows and highlight current mouse recipient
 map<HWND, HBRUSH> windowmap;
@@ -72,17 +72,26 @@ LPCWSTR WndClassTLW = L"Window Frame",
         WndTitleTLW = L"Window Tree Depth Test - Window Frame",
         WndTitleChild = L"Window Tree Depth Test - Child";
 
-bool CreateWindowTree(int depth, HWND hwndParent)
+RECT GetClientRect(HWND hwnd)
+{
+    RECT rcClient;
+    ::GetClientRect(hwnd, &rcClient);
+    return rcClient;
+}
+
+#define RCWIDTH(rc) (rc.right-rc.left)
+#define RCHEIGHT(rc) (rc.bottom-rc.top)
+
+bool CreateWindowTree(int depth, HWND hwndParent, int step)
 {
     if (depth <= 0) {
         return true;
     }
 
     // Each child is the size of it's parent indented by step
-    RECT rcClient;
-    GetClientRect(hwndParent, &rcClient);
-    int cx = rcClient.right - rcClient.left - (2 * step);
-    int cy = rcClient.bottom - rcClient.top - (2 * step);
+    RECT rcClient = GetClientRect(hwndParent);
+    int cx = RCWIDTH(rcClient) - (2 * step);
+    int cy = RCHEIGHT(rcClient) - (2 * step);
 
     // Create the child window
     HWND hwndChild = CreateWindowEx(
@@ -98,7 +107,7 @@ bool CreateWindowTree(int depth, HWND hwndParent)
     ShowWindow(hwndChild, SW_SHOW);
 
     // Create more children
-    return CreateWindowTree(depth - 1, hwndChild);
+    return CreateWindowTree(depth - 1, hwndChild, step);
 }
 
 bool CreateWindowTree()
@@ -118,8 +127,13 @@ bool CreateWindowTree()
 
     ShowWindow(hwnd, SW_SHOW);
 
+    // Calculate step
+    RECT rc = GetClientRect(hwnd);
+    int step = max(1, (min(RCWIDTH(rc), RCHEIGHT(rc)) / depth) / 2 - 2);
+    printf("Using step size of %i\n", step);
+
     // Create child windows
-    if (!CreateWindowTree(depth, hwnd)) {
+    if (!CreateWindowTree(depth, hwnd, step)) {
         return false;
     }
 
@@ -157,10 +171,35 @@ bool RegisterWindows()
     return true;
 }
 
-int main()
+void CheckArgs(int argc, char *argv[])
+{
+    if (argc > 1) {
+        int maxDepth = 35;
+        try {
+            int depthOverride = stoi(string(argv[1]));
+
+            if (depthOverride > 0) {
+                if (depthOverride < maxDepth ||
+                    (argc > 2 && strcmp(argv[2], "-f"))) {
+                    printf("Using depth: %i\n", depthOverride);
+                    depth = depthOverride;
+                } else {
+                    printf("ERROR include '-f' for values > %i, using default depth %i\n",
+                        maxDepth, depth);
+                }
+            }
+        } catch (...) {
+            printf("ERROR only accepts integer argument (depth), > %i requires -f\n",
+                maxDepth);
+        }
+    }
+}
+
+int main(int argc, char *argv[])
 {
     srand((int)time(NULL));
     hInst = GetModuleHandle(NULL);
+    CheckArgs(argc, argv);
 
     // Initialize windows
     if (!RegisterWindows() || !CreateWindowTree()) {
