@@ -4,68 +4,109 @@
 #include <time.h>
 using namespace std;
 
+// Window size
+int cx = 700, cy = 600;
+
+// WARNING:
+// A tree depth of 5 creates 1365 window,
+// but 100 will take down the system (bluescreen).
+// ... Do NOT tweak this on a critical system.
+
+// Window tree depth and spacing
+int depth = 4; // !WANRING! keep this guy VERY low, < 5 unless on a test machine
+int step = 2; // spacing between a parent and it's children
+
 HINSTANCE hInst;
 LPCWSTR WndClassTLW = L"Window Frame",
-WndClassChild = L"Child";
-LPCWSTR WndTitleTLW = L"Window Tree Depth Test - Window Frame",
-WndTitleChild = L"Window Tree Depth Test - Child";
-
-struct WindowInfo
-{
-    int index;
-    HBRUSH hbr;
-};
-map<HWND, WindowInfo> windowmap;
+        WndClassChild = L"Child",
+        WndTitleTLW = L"Window Tree Depth Test - Window Frame",
+        WndTitleChild = L"Window Tree Depth Test - Child";
+HWND CreateWindowWrap(HWND hWndParent, int x, int y, int cx, int cy);
+map<HWND, HBRUSH> windowmap;
 HWND hwndMouseLast = NULL;
 
-VOID AddWindowToMap(HWND hwnd)
+
+BOOL CreateWindowTree(int depth, int step, HWND hwnd)
 {
-    WindowInfo wi = {};
+    // When depth hits zero we've reached the depth limit
+    if (depth <= 0) {
+        return TRUE;
+    }
 
-    // Assign window an index
-    static int iIndex = 0;
-    wi.index = iIndex++;
+    // For each window, first create four children filling up each corner,
+    // with 'step' space between the parent and children.
+    RECT rcClient;
+    GetClientRect(hwnd, &rcClient);
+    int cx = rcClient.right - rcClient.left - (2 * step);
+    int cy = rcClient.bottom - rcClient.top - (2 * step);
 
-    // Assign window a color
-    int r = rand() % 255;
-    int g = rand() % 255;
-    int b = rand() % 255;
-    printf("Giving window %i RGB(%i, %i, %i)\n",
-        wi.index, r, g, b);
+    HWND hwnd1 = CreateWindowWrap(hwnd, step, step, cx / 2, cy / 2);
+    HWND hwnd2 = CreateWindowWrap(hwnd, step, cy / 2, cx / 2, cy / 2);
+    HWND hwnd3 = CreateWindowWrap(hwnd, cx / 2, step, cx / 2, cy / 2);
+    HWND hwnd4 = CreateWindowWrap(hwnd, cx / 2, cy / 2, cx / 2, cy / 2);
+    if (!hwnd1 || !hwnd2 || !hwnd3 || !hwnd4) {
+        printf("Creating child window failed, aborting tree creation.\n");
+        return FALSE;
+    }
 
-    wi.hbr = CreateSolidBrush(RGB(r, g, b));
+    // Create a window tree for each child, decrementing depth by 1
+    depth--;
+    return CreateWindowTree(depth, step, hwnd1) &&
+           CreateWindowTree(depth, step, hwnd2) &&
+           CreateWindowTree(depth, step, hwnd3) &&
+           CreateWindowTree(depth, step, hwnd4);
+}
 
-    // Add window info to window map
-    windowmap[hwnd] = wi;
+BOOL CreateWindowTree()
+{
+    HWND hwnd = CreateWindowWrap(NULL, CW_USEDEFAULT, CW_USEDEFAULT, cx, cy);
+    if (!CreateWindowTree(depth, step, hwnd)) {
+        return FALSE;
+    }
+
+    printf("Created %i windows.\n", windowmap.size());
+    return TRUE;
 }
 
 VOID Draw(HDC hdc, HWND hwnd)
 {
     RECT rcClient;
     GetClientRect(hwnd, &rcClient);
-    HBRUSH hbr = windowmap[hwnd].hbr;
-    FillRect(hdc, &rcClient, hbr);
+    
+    static HBRUSH hbrHover = CreateSolidBrush(RGB(229, 244, 66));
+    FillRect(hdc, &rcClient,
+        (hwnd == hwndMouseLast) ? hbrHover : windowmap[hwnd]);
 }
 
-
-VOID CALLBACK WndProcCommon(
-    HWND hwnd,
-    UINT message,
-    WPARAM wParam,
-    LPARAM lParam)
+VOID WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam, BOOL bTLW)
 {
     PAINTSTRUCT ps;
+    HDC hdc;
+
     switch (message)
     {
     case WM_CREATE:
-        AddWindowToMap(hwnd);
+        // Pick a random color, create a brush of that color, and add
+        // brush to the window map
+        windowmap[hwnd] = CreateSolidBrush(
+            RGB(rand() % 255, rand() % 255, rand() % 255));
         break;
 
     case WM_PAINT:
-        HDC hdc = BeginPaint(hwnd, &ps);
+        hdc = BeginPaint(hwnd, &ps);
         Draw(hdc, hwnd);
         EndPaint(hwnd, &ps);
         break;
+
+    case WM_MOUSEMOVE:
+        if (hwndMouseLast != hwnd) {
+            HWND hwndPrev = hwndMouseLast;
+            hwndMouseLast = hwnd;
+            InvalidateRect(hwnd, NULL, TRUE);
+            InvalidateRect(hwndPrev, NULL, TRUE);
+        }
+        break;
+
     }
 }
 
@@ -75,18 +116,7 @@ LRESULT CALLBACK WndProcChild(
     WPARAM wParam,
     LPARAM lParam)
 {
-    WndProcCommon(hwnd, message, wParam, lParam);
-
-    switch (message)
-    {
-    case WM_MOUSEMOVE:
-        if (hwndMouseLast != hwnd) {
-            printf("Child %i seeing mouse messages...\n",
-                windowmap[hwnd].index);
-            hwndMouseLast = hwnd;
-        }
-        break;
-    }
+    WndProc(hwnd, message, wParam, lParam, FALSE);
     return DefWindowProc(hwnd, message, wParam, lParam);
 }
 
@@ -96,27 +126,16 @@ LRESULT CALLBACK WndProcTLW(
     WPARAM wParam,
     LPARAM lParam)
 {
-    WndProcCommon(hwnd, message, wParam, lParam);
+    WndProc(hwnd, message, wParam, lParam, TRUE);
 
-    switch (message)
-    {
-    case WM_MOUSEMOVE:
-        if (hwndMouseLast != hwnd) {
-            printf("Frame seeing mouse messages...\n");
-            hwndMouseLast = hwnd;
-        }
-        break;
-
-    case WM_DESTROY:
+    if (message == WM_DESTROY) {
         PostQuitMessage(0);
     }
 
     return DefWindowProc(hwnd, message, wParam, lParam);
 }
 
-HWND CreateWindowWrap(
-    HWND hWndParent,
-    int x, int y, int cx, int cy)
+HWND CreateWindowWrap(HWND hWndParent, int x, int y, int cx, int cy)
 {
     BOOL bTLW = hWndParent == NULL;
 
@@ -129,45 +148,11 @@ HWND CreateWindowWrap(
         hWndParent, nullptr, hInst, nullptr);
 
     if (!hwnd) {
-        printf("Failed to create %s\n",
-            bTLW ? "window  frame" : "child window");
         return NULL;
     }
 
     ShowWindow(hwnd, SW_SHOW);
     return hwnd;
-}
-
-BOOL CreateWindowTree(int depth, HWND hwndParent)
-{
-    if (depth <= 0) {
-        return TRUE;
-    }
-
-    int cx = 700, cy = 600; // starting window size
-    static int step = 10;
-    if (hwndParent == NULL) {
-        HWND hwndTLW = CreateWindowWrap(NULL, CW_USEDEFAULT, CW_USEDEFAULT, cx, cy);
-
-        RECT rcClient;
-        GetClientRect(hwndParent, &rcClient);
-        cx = rcClient.right - rcClient.left;
-        cy = rcClient.bottom - rcClient.top;
-
-        step = cx / depth;
-        CreateWindowTree(depth, hwndTLW);
-        return TRUE;
-    }
-
-    RECT rcClient;
-    GetClientRect(hwndParent, &rcClient);
-    cx = rcClient.right - rcClient.left;
-    cy = rcClient.bottom - rcClient.top;
-
-    return CreateWindowTree(depth - 1, CreateWindowWrap(hwndParent, step,   step,   cx / 2, cy / 2)) &&
-           CreateWindowTree(depth - 1, CreateWindowWrap(hwndParent, step,   cy / 2, cx / 2, cy / 2)) &&
-           CreateWindowTree(depth - 1, CreateWindowWrap(hwndParent, cx / 2, step,   cx / 2, cy / 2)) &&
-           CreateWindowTree(depth - 1, CreateWindowWrap(hwndParent, cx / 2, cy / 2, cx / 2, cy / 2));
 }
 
 BOOL RegisterWindows()
@@ -201,16 +186,15 @@ BOOL RegisterWindows()
 int main()
 {
     srand(time(NULL));
-    hInst = GetModuleHandle(NULL); 
+    hInst = GetModuleHandle(NULL);
+
     if (!RegisterWindows()) {
         return 1;
     }
     
-    if (!CreateWindowTree(6, NULL)) {
+    if (!CreateWindowTree()) {
         return 1;
     }
-
-    printf("Initialized window, entering message loop.\n");
 
     MSG msg;
     while (GetMessage(&msg, nullptr, 0, 0)) {
