@@ -184,13 +184,13 @@ void CheckArgs(int argc, char *argv[])
                     printf("Using depth: %i\n", depthOverride);
                     depth = depthOverride;
                 } else {
-                    printf("ERROR include '-f' for values > %i, using default depth %i\n",
-                        maxDepth, depth);
+                    printf("ERROR include '-f' for values > %i\n", maxDepth);
+                    printf("... using default depth %i\n", depth);
                 }
             }
         } catch (...) {
-            printf("ERROR only accepts integer argument (depth), >%i requires -f\n",
-                maxDepth);
+            printf("ERROR only accepts integer argument (depth).\n");
+            printf("note: >%i requires - f\n", maxDepth);
         }
     }
 }
