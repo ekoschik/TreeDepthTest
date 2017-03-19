@@ -48,8 +48,8 @@ LRESULT CALLBACK WndProc(
     }
 
     case WM_MOUSEMOVE:
-        // Set this window as the highlight window, and repaint the previous
-        // highlight window
+        // Set the current window under the cursor as the highlight window,
+        // and repaint the new and old highlight window
         if (hwndMouseLast != hwnd) {
             HWND hwndPrev = hwndMouseLast;
             hwndMouseLast = hwnd;
@@ -106,7 +106,7 @@ bool CreateWindowTree(int depth, HWND hwndParent, int step)
 
     ShowWindow(hwndChild, SW_SHOW);
 
-    // Create more children
+    // Create next child
     return CreateWindowTree(depth - 1, hwndChild, step);
 }
 
@@ -189,7 +189,7 @@ void CheckArgs(int argc, char *argv[])
                 }
             }
         } catch (...) {
-            printf("ERROR only accepts integer argument (depth), > %i requires -f\n",
+            printf("ERROR only accepts integer argument (depth), >%i requires -f\n",
                 maxDepth);
         }
     }
