@@ -116,7 +116,7 @@ bool CreateWindowTree()
     HWND hwnd = CreateWindowEx(0,
         WndClassTLW,
         WndTitleTLW,
-        WS_OVERLAPPEDWINDOW,
+        WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME,
         CW_USEDEFAULT, CW_USEDEFAULT, cx, cy,
         NULL, nullptr, hInst, nullptr);
 
