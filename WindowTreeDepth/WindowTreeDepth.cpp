@@ -16,7 +16,11 @@ map<HWND, HBRUSH> windowmap;
 HWND hwndMouseLast = NULL;
 COLORREF rgbHighlight = RGB(229, 244, 66);
 
-VOID WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam, BOOL bTLW)
+LRESULT CALLBACK WndProc(
+    HWND hwnd,
+    UINT message,
+    WPARAM wParam,
+    LPARAM lParam)
 {
     switch (message)
     {
@@ -53,29 +57,10 @@ VOID WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam, BOOL bTLW)
             InvalidateRect(hwndPrev, NULL, TRUE);
         }
         break;
-    }
-}
 
-LRESULT CALLBACK WndProcChild(
-    HWND hwnd,
-    UINT message,
-    WPARAM wParam,
-    LPARAM lParam)
-{
-    WndProc(hwnd, message, wParam, lParam, FALSE);
-    return DefWindowProc(hwnd, message, wParam, lParam);
-}
-
-LRESULT CALLBACK WndProcTLW(
-    HWND hwnd,
-    UINT message,
-    WPARAM wParam,
-    LPARAM lParam)
-{
-    WndProc(hwnd, message, wParam, lParam, TRUE);
-
-    if (message == WM_DESTROY) {
+    case WM_DESTROY:
         PostQuitMessage(0);
+        break;
     }
 
     return DefWindowProc(hwnd, message, wParam, lParam);
@@ -105,7 +90,7 @@ BOOL CreateWindowTree(int depth, HWND hwndParent)
         step, step, cx , cy,
         hwndParent, nullptr, hInst, nullptr);
 
-    if (hwndChild == NULL) {
+    if (!hwndChild) {
         printf("CreateWindow failed, last error: %i\n", GetLastError());
         return FALSE;
     }
@@ -149,7 +134,7 @@ BOOL RegisterWindows()
 
     // Register top level window class
     wcex.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
-    wcex.lpfnWndProc = WndProcTLW;
+    wcex.lpfnWndProc = WndProc;
     wcex.hInstance = hInst;
     wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wcex.lpszClassName = WndClassTLW;
@@ -160,7 +145,7 @@ BOOL RegisterWindows()
 
     // Register child window class
     wcex.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
-    wcex.lpfnWndProc = WndProcChild;
+    wcex.lpfnWndProc = WndProc;
     wcex.hInstance = hInst;
     wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wcex.lpszClassName = WndClassChild;
